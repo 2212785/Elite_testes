@@ -170,6 +170,17 @@
                 <button onclick="window.switchView('view-financeiro')" class="px-4 py-1.5 text-slate-400 text-[10px] font-black uppercase">Dashboard BI</button>
             </div>
         </nav>
+
+        <div class="glass mx-auto max-w-sm mb-4 p-3 rounded-2xl flex justify-between items-center border-l-4 border-amber-500">
+            <div>
+                <p class="text-[8px] text-slate-500 uppercase font-black">Projeto Ativo</p>
+                <h4 id="nome-projeto-logistica" class="text-[10px] font-black text-amber-500 uppercase italic">Carregando...</h4>
+            </div>
+            <button onclick="window.abrirSeletorProjetos()" class="bg-white/10 hover:bg-white/20 px-3 py-2 rounded-xl text-[8px] font-black uppercase text-white transition-all">
+                🔄 Trocar
+            </button>
+        </div>
+
         <div id="controles-admin" class="hidden flex flex-wrap gap-2 mb-4 justify-center">
             <button onclick="window.abrirNovoProjeto()" class="glass px-4 py-2 rounded-xl text-[8px] font-black text-emerald-400 uppercase">Novo Projeto</button>
             <button onclick="window.abrirGestaoCentralizada()" class="glass px-4 py-2 rounded-xl text-[8px] font-black text-blue-400 uppercase">Dados Projeto</button>
@@ -265,6 +276,11 @@
                 projetoDB = pS.val();
                 document.getElementById('escola-titulo').innerText = projetoDB.cidade;
                 document.getElementById('sub-escola').innerText = projetoDB.escola || projetoDB.school;
+                
+                // Atualiza o indicador visual de qual projeto está rodando
+                if(document.getElementById('nome-projeto-logistica')) {
+                    document.getElementById('nome-projeto-logistica').innerText = projetoDB.cidade + " - " + (projetoDB.escola || "");
+                }
 
                 if (projetoDB.data_inicio) {
                     window.gerarBotoesDatas(projetoDB.data_inicio, projetoDB.data_fim);
@@ -272,12 +288,10 @@
 
                 window.carregarRelatorio();
 
-                // LEI: Persistência de Login ADM
                 if (sessionStorage.getItem('isAdm') === 'true') {
                     document.getElementById('controles-admin').classList.remove('hidden');
                 }
 
-                // --- ESCUTA DO STATUS DO BOT (LED) ---
                 onValue(ref(db, `projetos/${projId}/bot`), (botSnap) => {
                     const led = document.getElementById('bot-led');
                     const txt = document.getElementById('bot-status-text');
@@ -396,6 +410,47 @@
             }, 1000);
         };
 
+        // --- FUNÇÃO PARA ABRIR O SELETOR DE PROJETOS ---
+        window.abrirSeletorProjetos = async () => {
+            document.getElementById('modalGestao').style.display = 'flex';
+            document.getElementById('gestao-menu').classList.add('hidden');
+            const f = document.getElementById('gestao-form');
+            f.classList.remove('hidden');
+            f.innerHTML = `<h3 class="text-white font-black text-xs uppercase mb-4 text-center">Selecionar Projeto</h3><div id="lista-projetos-selecao" class="space-y-2 max-h-60 overflow-y-auto">Carregando projetos...</div>`;
+
+            try {
+                const snap = await get(ref(db, "projetos"));
+                if (snap.exists()) {
+                    const projetos = snap.val();
+                    let html = "";
+                    Object.keys(projetos).forEach(id => {
+                        const p = projetos[id];
+                        const estaAtivo = (id === projId);
+                        html += `
+                            <button onclick="window.ativarProjeto('${id}')" 
+                                class="w-full p-4 rounded-2xl text-left transition-all border ${estaAtivo ? 'border-amber-500 bg-amber-500/20' : 'border-white/5 bg-white/5 hover:bg-white/10'}">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-[10px] font-bold text-white uppercase">${p.cidade}</span>
+                                    ${estaAtivo ? '<span class="text-[8px] bg-amber-500 text-black px-2 py-0.5 rounded font-black">ATIVO</span>' : ''}
+                                </div>
+                                <p class="text-[8px] text-slate-500">${p.escola || 'Sem escola'}</p>
+                            </button>`;
+                    });
+                    document.getElementById('lista-projetos-selecao').innerHTML = html;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        };
+
+        // --- FUNÇÃO PARA TROCAR O PROJETO NO BANCO ---
+        window.ativarProjeto = async (id) => {
+            if (confirm(`Deseja alternar para o projeto: ${id.toUpperCase()}?`)) {
+                await set(ref(db, "config/projeto_ativo"), id);
+                location.reload(); 
+            }
+        };
+
         // --- RELATÓRIOS E BI ---
         window.menuRelatorio = () => {
             document.getElementById('modalGestao').style.display = 'flex';
@@ -409,17 +464,7 @@
             const fD = document.getElementById('filtro-bi').value;
             let list = fD ? window.dadosCompletos.filter(i => i.data === fD) : window.dadosCompletos;
             if (tipo !== 'Geral') list = list.filter(i => i.vendedor === tipo);
-            let r = {
-                v: 0,
-                nq: 0,
-                tot: 0,
-                pix: 0,
-                din: 0,
-                deb: 0,
-                cre: 0,
-                bol: 0,
-                ent: 0
-            };
+            let r = { v: 0, nq: 0, tot: 0, pix: 0, din: 0, deb: 0, cre: 0, bol: 0, ent: 0 };
             list.forEach(i => {
                 if (i.resultado === "Venda") {
                     r.v++;
@@ -446,41 +491,16 @@
         window.filtrarBI = () => {
             const fD = document.getElementById('filtro-bi').value;
             let list = fD ? window.dadosCompletos.filter(i => i.data === fD) : window.dadosCompletos;
-            let m = {
-                v: 0,
-                nq: 0,
-                tot: 0,
-                pix: 0,
-                din: 0,
-                deb: 0,
-                cre: 0,
-                bol: 0,
-                com: 0
-            };
+            let m = { v: 0, nq: 0, tot: 0, pix: 0, din: 0, deb: 0, cre: 0, bol: 0, com: 0 };
             let vend = {
-                Evanio: {
-                    v: 0,
-                    nq: 0,
-                    tot: 0,
-                    com: 0,
-                    ent: 0
-                },
-                Willian: {
-                    v: 0,
-                    nq: 0,
-                    tot: 0,
-                    com: 0,
-                    ent: 0
-                }
+                Evanio: { v: 0, nq: 0, tot: 0, com: 0, ent: 0 },
+                Willian: { v: 0, nq: 0, tot: 0, com: 0, ent: 0 }
             };
             let chartData = {};
             list.forEach(i => {
                 const vn = i.vendedor || "Willian";
                 const d = i.data;
-                if (!chartData[d]) chartData[d] = {
-                    v: 0,
-                    nq: 0
-                };
+                if (!chartData[d]) chartData[d] = { v: 0, nq: 0 };
                 if (i.resultado === "Venda") {
                     m.v++;
                     m.tot += Number(i.valor) || 0;
@@ -544,24 +564,13 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: {
-                            display: false
-                        }
+                        legend: { display: false }
                     },
                     scales: {
-                        y: {
-                            display: false
-                        },
+                        y: { display: false },
                         x: {
-                            grid: {
-                                display: false
-                            },
-                            ticks: {
-                                color: '#64748b',
-                                font: {
-                                    size: 8
-                                }
-                            }
+                            grid: { display: false },
+                            ticks: { color: '#64748b', font: { size: 8 } }
                         }
                     }
                 }
@@ -570,16 +579,13 @@
 
         // --- GESTÃO E CUSTOS (CORREÇÃO DE CAMPOS FALTANTES) ---
         window.abrirGestaoCentralizada = () => {
-            const c = custosDB || {}; 
+            const c = custosDB || {};
             const p = projetoDB || {};
-            
             document.getElementById('modalGestao').style.display = 'flex';
             document.getElementById('gestao-menu').classList.add('hidden');
             const f = document.getElementById('gestao-form');
             f.classList.remove('hidden');
-
             const auto = p.automacao || { lista: "", msg1: "", msg2: "", msg3: "", msg4: "" };
-
             f.innerHTML = `
                 <h3 class="text-blue-400 font-black text-[10px] uppercase mb-4 text-white">Dados do Projeto</h3>
                 <div class="space-y-3 text-white">
@@ -590,22 +596,19 @@
                             <input type="date" id="pDf" value="${p.data_fim || ''}" class="input-compact flex-grow">
                         </div>
                     </div>
-
                     <div>
                         <p class="text-[8px] text-amber-500 uppercase font-bold">Lista Disparo (Nome, Telefone)</p>
                         <textarea id="pLista" class="input-compact h-24 text-[10px]">${auto.lista || ''}</textarea>
                     </div>
                     <div>
-                        <p class="text-[8px] text-blue-400 uppercase font-bold">Mensagens ({crianca} e {escola})</p>
+                        <p class="text-[8px] text-blue-400 uppercase font-bold">Mensagens ({criança} e {escola})</p>
                         <textarea id="m1" class="input-compact h-10 text-[10px] mb-1" placeholder="Msg 1">${auto.msg1 || ''}</textarea>
                         <textarea id="m2" class="input-compact h-10 text-[10px] mb-1" placeholder="Msg 2">${auto.msg2 || ''}</textarea>
                         <textarea id="m3" class="input-compact h-10 text-[10px] mb-1" placeholder="Msg 3">${auto.msg3 || ''}</textarea>
                         <textarea id="m4" class="input-compact h-10 text-[10px] mb-1" placeholder="Msg 4">${auto.msg4 || ''}</textarea>
                     </div>
-
                     <hr class="opacity-10">
                     <p class="text-[8px] text-emerald-400 uppercase font-black mb-2">Despesas de Viagem</p>
-                    
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="label-custo">VALOR KM</label>
@@ -620,7 +623,6 @@
                         <label class="label-custo">TOTAL PEDÁGIO (R$)</label>
                         <input type="number" id="cPt" value="${c.pedagio_total || 0}" step="0.01" class="input-compact">
                     </div>
-
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="label-custo">DIÁRIAS HOSP.</label>
@@ -631,7 +633,6 @@
                             <input type="number" id="cHv" value="${c.hosp_valor || 0}" step="0.01" class="input-compact">
                         </div>
                     </div>
-
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="label-custo">QTD ALIMENT.</label>
@@ -676,26 +677,19 @@
         window.filtrarLogistica = () => {
             const cont = document.getElementById('lista-visitas');
             if (!cont) return;
-
             cont.innerHTML = '';
-
             const fD = document.getElementById('filtro-data-logistica').value;
             let list = fD ? window.dadosCompletos.filter(i => i.data === fD) : window.dadosCompletos;
-
             list.sort((a, b) => {
                 const da = new Date(`${a.data}T${a.horario || '23:59'}`);
                 const db = new Date(`${b.data}T${b.horario || '23:59'}`);
                 return da - db;
             });
-
             list.forEach(i => {
                 let status = i.resultado || "PENDENTE";
                 let cor = status === "Venda" ? "text-emerald-500" :
-                    status === "NQ" ? "text-rose-500" :
-                    "text-slate-400";
-
+                    status === "NQ" ? "text-rose-500" : "text-slate-400";
                 const dataBR = i.data ? i.data.split('-').reverse().join('/') : '';
-
                 cont.innerHTML += `
                     <div class="glass p-4 rounded-3xl flex flex-col gap-3 border border-white/5">
                         <div class="flex justify-between items-start">
@@ -825,29 +819,22 @@
             document.querySelectorAll('.day-btn').forEach(x => x.classList.remove('active'));
             b.classList.add('active');
             document.getElementById('data-selecionada').value = iso;
-
             const selectH = document.getElementById('horario');
             selectH.innerHTML = '<option value="">Consultando vagas...</option>';
-
             try {
                 const snapshot = await get(ref(db, `dados/${projId}/agendamentos/${iso}`));
                 const agendadosNoDia = snapshot.exists() ? snapshot.val() : {};
-
                 const todosHorarios = window.obterHorariosArray(iso, false);
                 selectH.innerHTML = '<option value="">Selecione o Horário</option>';
-
                 todosHorarios.forEach(h => {
                     let contagem = 0;
-                    Object.values(agendadosNoDia).forEach(ag => {
-                        if (ag.horario === h) contagem++;
-                    });
+                    Object.values(agendadosNoDia).forEach(ag => { if (ag.horario === h) contagem++; });
                     if (contagem < 2) {
                         selectH.innerHTML += `<option value="${h}">${h}</option>`;
                     } else {
                         console.log(`Horário ${h} lotado.`);
                     }
                 });
-
                 if (selectH.options.length <= 1) {
                     selectH.innerHTML = '<option value="">Agenda lotada para este dia!</option>';
                 }
@@ -888,26 +875,17 @@
                 ]);
                 window.dadosCompletos = [];
                 custosDB = sC.exists() ? sC.val() : {};
-                valesDB = sVales.exists() ? sVales.val() : {
-                    evanio: 0,
-                    willian: 0
-                };
+                valesDB = sVales.exists() ? sVales.val() : { evanio: 0, willian: 0 };
                 const proc = (pasta, base) => {
                     if (!pasta) return;
                     Object.keys(pasta).forEach(k => {
                         const item = pasta[k];
                         if (typeof item === 'object' && !item.nome_formando) {
                             Object.keys(item).forEach(subK => window.dadosCompletos.push({
-                                ...item[subK],
-                                id: subK,
-                                data: k,
-                                path: `${base}/${k}/${subK}`
+                                ...item[subK], id: subK, data: k, path: `${base}/${k}/${subK}`
                             }));
                         } else window.dadosCompletos.push({
-                            ...item,
-                            id: k,
-                            data: item.data || k,
-                            path: `${base}/${k}`
+                            ...item, id: k, data: item.data || k, path: `${base}/${k}`
                         });
                     });
                 };
@@ -927,9 +905,7 @@
 
         window.resetIndex = async () => {
             if (confirm("Reiniciar fila?")) {
-                await update(ref(db, `projetos/${projId}/automacao`), {
-                    index_atual: 0
-                });
+                await update(ref(db, `projetos/${projId}/automacao`), { index_atual: 0 });
                 location.reload();
             }
         };
@@ -944,10 +920,7 @@
 
         window.limparRegistroVisita = async () => {
             if (confirm("Zerar?")) await update(ref(db, window.itemPath), {
-                resultado: "Pendente",
-                valor: 0,
-                pagamentos: null,
-                num_album: ""
+                resultado: "Pendente", valor: 0, pagamentos: null, num_album: ""
             });
             window.carregarRelatorio();
             window.fecharModalGestao();
@@ -965,10 +938,7 @@
             const city = document.getElementById('pC').value;
             const id = city.toLowerCase().replace(/\s+/g, '-');
             await set(ref(db, `projetos/${id}`), {
-                cidade: city,
-                escola: document.getElementById('pS').value,
-                data_inicio: document.getElementById('pSt').value,
-                data_fim: document.getElementById('pEd').value
+                cidade: city, escola: document.getElementById('pS').value, data_inicio: document.getElementById('pSt').value, data_fim: document.getElementById('pEd').value
             });
             await set(ref(db, "config/projeto_ativo"), id);
             location.reload();
@@ -984,8 +954,7 @@
 
         window.salvarVales = async () => {
             await update(ref(db, `vales/${projId}`), {
-                evanio: document.getElementById('vEva').value,
-                willian: document.getElementById('vWil').value
+                evanio: document.getElementById('vEva').value, willian: document.getElementById('vWil').value
             });
             await window.carregarRelatorio();
             window.fecharModalGestao();
