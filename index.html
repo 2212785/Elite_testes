@@ -277,7 +277,6 @@
                 document.getElementById('escola-titulo').innerText = projetoDB.cidade;
                 document.getElementById('sub-escola').innerText = projetoDB.escola || projetoDB.school;
                 
-                // Atualiza o indicador visual de qual projeto está rodando
                 if(document.getElementById('nome-projeto-logistica')) {
                     document.getElementById('nome-projeto-logistica').innerText = projetoDB.cidade + " - " + (projetoDB.escola || projetoDB.school || "Escola não informada");
                 }
@@ -288,12 +287,10 @@
 
                 window.carregarRelatorio();
 
-                // LEI: Persistência de Login ADM
                 if (sessionStorage.getItem('isAdm') === 'true') {
                     document.getElementById('controles-admin').classList.remove('hidden');
                 }
 
-                // --- ESCUTA DO STATUS DO BOT (LED) ---
                 onValue(ref(db, `projetos/${projId}/bot`), (botSnap) => {
                     const led = document.getElementById('bot-led');
                     const txt = document.getElementById('bot-status-text');
@@ -439,7 +436,10 @@
                                     </div>
                                     <p class="text-[8px] text-slate-500">${nomeEscola}</p>
                                 </button>
-                                <button onclick="window.excluirProjeto('${id}')" class="bg-rose-950/30 border border-rose-500/20 px-4 rounded-2xl text-rose-500 hover:bg-rose-500 hover:text-white transition-all">🗑️</button>
+                                <div class="flex flex-col gap-1">
+                                    <button onclick="window.editarInfoProjeto('${id}')" class="bg-blue-950/30 border border-blue-500/20 px-3 flex-grow rounded-xl text-[10px] hover:bg-blue-500 hover:text-white transition-all">✏️</button>
+                                    <button onclick="window.excluirProjeto('${id}')" class="bg-rose-950/30 border border-rose-500/20 px-3 flex-grow rounded-xl text-[10px] hover:bg-rose-500 hover:text-white transition-all">🗑️</button>
+                                </div>
                             </div>`;
                     });
                     document.getElementById('lista-projetos-selecao').innerHTML = html;
@@ -447,6 +447,39 @@
             } catch (e) {
                 console.error(e);
             }
+        };
+
+        // --- FUNÇÃO PARA EDITAR INFO DO PROJETO ---
+        window.editarInfoProjeto = async (id) => {
+            const snap = await get(ref(db, `projetos/${id}`));
+            if (snap.exists()) {
+                const p = snap.val();
+                document.getElementById('modalGestao').style.display = 'flex';
+                document.getElementById('gestao-menu').classList.add('hidden');
+                const f = document.getElementById('gestao-form');
+                f.classList.remove('hidden');
+                f.innerHTML = `
+                    <h3 class="text-blue-400 font-black text-[10px] uppercase mb-4">Editar Projeto</h3>
+                    <input type="text" id="editC" value="${p.cidade || ''}" placeholder="Cidade" class="input-compact mb-2">
+                    <input type="text" id="editS" value="${p.escola || p.school || ''}" placeholder="Escola" class="input-compact mb-2">
+                    <div class="flex gap-2 mb-4">
+                        <input type="date" id="editSt" value="${p.data_inicio || ''}" class="input-compact flex-grow text-[10px]">
+                        <input type="date" id="editEd" value="${p.data_fim || ''}" class="input-compact flex-grow text-[10px]">
+                    </div>
+                    <button onclick="window.salvarEdicaoProjeto('${id}')" class="btn-primary w-full py-4 rounded-xl font-black uppercase text-xs">Salvar Alterações</button>
+                `;
+            }
+        };
+
+        window.salvarEdicaoProjeto = async (id) => {
+            await update(ref(db, `projetos/${id}`), {
+                cidade: document.getElementById('editC').value,
+                escola: document.getElementById('editS').value,
+                data_inicio: document.getElementById('editSt').value,
+                data_fim: document.getElementById('editEd').value
+            });
+            alert("✅ Projeto atualizado!");
+            location.reload();
         };
 
         // --- FUNÇÃO PARA TROCAR O PROJETO NO BANCO ---
@@ -592,17 +625,14 @@
                         y: { display: false },
                         x: {
                             grid: { display: false },
-                            ticks: {
-                                color: '#64748b',
-                                font: { size: 8 }
-                            }
+                            ticks: { color: '#64748b', font: { size: 8 } }
                         }
                     }
                 }
             });
         };
 
-        // --- GESTÃO E CUSTOS (CORREÇÃO DE CAMPOS FALTANTES) ---
+        // --- GESTÃO E CUSTOS ---
         window.abrirGestaoCentralizada = () => {
             const c = custosDB || {};
             const p = projetoDB || {};
@@ -617,8 +647,8 @@
                     <div>
                         <p class="text-[8px] text-slate-500 uppercase">Período Ativo</p>
                         <div class="flex gap-2 mb-2">
-                            <input type="date" id="pDi" value="${p.data_inicio || ''}" class="input-compact flex-grow">
-                            <input type="date" id="pDf" value="${p.data_fim || ''}" class="input-compact flex-grow">
+                            <input type="date" id="pDi" value="${p.data_inicio || ''}" class="input-compact flex-grow text-[10px]">
+                            <input type="date" id="pDf" value="${p.data_fim || ''}" class="input-compact flex-grow text-[10px]">
                         </div>
                     </div>
                     <div>
@@ -635,38 +665,17 @@
                     <hr class="opacity-10">
                     <p class="text-[8px] text-emerald-400 uppercase font-black mb-2">Despesas de Viagem</p>
                     <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="label-custo">VALOR KM</label>
-                            <input type="number" id="cKv" value="${c.km_valor || 0.7}" step="0.01" class="input-compact">
-                        </div>
-                        <div>
-                            <label class="label-custo">KM TOTAL</label>
-                            <input type="number" id="cKt" value="${c.km_total || 0}" class="input-compact">
-                        </div>
+                        <div><label class="label-custo">VALOR KM</label><input type="number" id="cKv" value="${c.km_valor || 0.7}" step="0.01" class="input-compact"></div>
+                        <div><label class="label-custo">KM TOTAL</label><input type="number" id="cKt" value="${c.km_total || 0}" class="input-compact"></div>
                     </div>
-                    <div>
-                        <label class="label-custo">TOTAL PEDÁGIO (R$)</label>
-                        <input type="number" id="cPt" value="${c.pedagio_total || 0}" step="0.01" class="input-compact">
+                    <div><label class="label-custo">TOTAL PEDÁGIO (R$)</label><input type="number" id="cPt" value="${c.pedagio_total || 0}" step="0.01" class="input-compact"></div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="label-custo">DIÁRIAS HOSP.</label><input type="number" id="cHq" value="${c.hosp_qtd || 0}" class="input-compact"></div>
+                        <div><label class="label-custo">VALOR DIÁRIA</label><input type="number" id="cHv" value="${c.hosp_valor || 0}" step="0.01" class="input-compact"></div>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="label-custo">DIÁRIAS HOSP.</label>
-                            <input type="number" id="cHq" value="${c.hosp_qtd || 0}" class="input-compact">
-                        </div>
-                        <div>
-                            <label class="label-custo">VALOR DIÁRIA</label>
-                            <input type="number" id="cHv" value="${c.hosp_valor || 0}" step="0.01" class="input-compact">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="label-custo">QTD ALIMENT.</label>
-                            <input type="number" id="cAq" value="${c.alim_qtd || 0}" class="input-compact">
-                        </div>
-                        <div>
-                            <label class="label-custo">VALOR UNIT.</label>
-                            <input type="number" id="cAv" value="${c.alim_valor || 0}" step="0.01" class="input-compact">
-                        </div>
+                        <div><label class="label-custo">QTD ALIMENT.</label><input type="number" id="cAq" value="${c.alim_qtd || 0}" class="input-compact"></div>
+                        <div><label class="label-custo">VALOR UNIT.</label><input type="number" id="cAv" value="${c.alim_valor || 0}" step="0.01" class="input-compact"></div>
                     </div>
                 </div>
                 <button onclick="window.salvarTudoProjeto()" class="btn-primary w-full py-4 rounded-xl font-black uppercase text-xs mt-6">Gravar Tudo</button>
@@ -758,13 +767,9 @@
         };
 
         window.switchView = function(viewId) {
-            document.querySelectorAll('.view-section').forEach(view => {
-                view.classList.remove('view-active');
-            });
+            document.querySelectorAll('.view-section').forEach(view => { view.classList.remove('view-active'); });
             const target = document.getElementById(viewId);
-            if (target) {
-                target.classList.add('view-active');
-            }
+            if (target) { target.classList.add('view-active'); }
         };
 
         // --- AUXILIARES ---
@@ -777,10 +782,7 @@
         };
 
         window.acessoAdmin = () => {
-            if (sessionStorage.getItem('isAdm') === 'true') {
-                window.switchView('view-logistica');
-                return;
-            }
+            if (sessionStorage.getItem('isAdm') === 'true') { window.switchView('view-logistica'); return; }
             const s = prompt("Senha:");
             if (s === "2025") {
                 sessionStorage.setItem('isAdm', 'true');
@@ -854,19 +856,10 @@
                 todosHorarios.forEach(h => {
                     let contagem = 0;
                     Object.values(agendadosNoDia).forEach(ag => { if (ag.horario === h) contagem++; });
-                    if (contagem < 2) {
-                        selectH.innerHTML += `<option value="${h}">${h}</option>`;
-                    } else {
-                        console.log(`Horário ${h} lotado.`);
-                    }
+                    if (contagem < 2) { selectH.innerHTML += `<option value="${h}">${h}</option>`; }
                 });
-                if (selectH.options.length <= 1) {
-                    selectH.innerHTML = '<option value="">Agenda lotada para este dia!</option>';
-                }
-            } catch (error) {
-                console.error("Erro na trava:", error);
-                selectH.innerHTML = '<option value="">Erro ao carregar horários</option>';
-            }
+                if (selectH.options.length <= 1) { selectH.innerHTML = '<option value="">Agenda lotada!</option>'; }
+            } catch (error) { selectH.innerHTML = '<option value="">Erro carregar horários</option>'; }
         };
 
         document.getElementById('form-agendamento').onsubmit = async (e) => {
@@ -878,25 +871,18 @@
             const h = document.getElementById('horario').value;
             const ed = document.getElementById('endereco').value;
             await set(ref(db, `dados/${projId}/agendamentos/${dt}/AG-${Date.now()}`), {
-                nome_formando: n,
-                telefone: t,
-                endereco: ed,
-                horario: h,
-                resultado: "Pendente"
+                nome_formando: n, telefone: t, endereco: ed, horario: h, resultado: "Pendente"
             });
-            alert("✅ VISITA AGENDADA COM SUCESSO!");
-            const txt = `Olá! Agendamento Elite.\nData: ${dt.split('-').reverse().join('/')}\nHora: ${h}\nFormando: ${n}\nEndereço: ${ed}`;
-            window.location.href = `https://wa.me/5516993291674?text=${encodeURIComponent(txt)}`;
+            alert("✅ VISITA AGENDADA!");
+            window.location.href = `https://wa.me/5516993291674?text=${encodeURIComponent("Agendamento Elite: "+n)}`;
         };
 
         window.carregarRelatorio = async () => {
             if (!projId) return;
             try {
                 const [sA, sV, sC, sVales] = await Promise.all([
-                    get(ref(db, `dados/${projId}/agendamentos`)),
-                    get(ref(db, `vendas/${projId}`)),
-                    get(ref(db, `custos/${projId}`)),
-                    get(ref(db, `vales/${projId}`))
+                    get(ref(db, `dados/${projId}/agendamentos`)), get(ref(db, `vendas/${projId}`)),
+                    get(ref(db, `custos/${projId}`)), get(ref(db, `vales/${projId}`))
                 ]);
                 window.dadosCompletos = [];
                 custosDB = sC.exists() ? sC.val() : {};
@@ -906,12 +892,8 @@
                     Object.keys(pasta).forEach(k => {
                         const item = pasta[k];
                         if (typeof item === 'object' && !item.nome_formando) {
-                            Object.keys(item).forEach(subK => window.dadosCompletos.push({
-                                ...item[subK], id: subK, data: k, path: `${base}/${k}/${subK}`
-                            }));
-                        } else window.dadosCompletos.push({
-                            ...item, id: k, data: item.data || k, path: `${base}/${k}`
-                        });
+                            Object.keys(item).forEach(subK => window.dadosCompletos.push({ ...item[subK], id: subK, data: k, path: `${base}/${k}/${subK}` }));
+                        } else window.dadosCompletos.push({ ...item, id: k, data: item.data || k, path: `${base}/${k}` });
                     });
                 };
                 if (sA.exists()) proc(sA.val(), `dados/${projId}/agendamentos`);
@@ -920,35 +902,21 @@
                     if (v.avulsos) proc(v.avulsos, `vendas/${projId}/avulsos`);
                     if (v.agendamentos) proc(v.agendamentos, `vendas/${projId}/agendamentos`);
                 }
-                window.filtrarLogistica();
-                window.filtrarBI();
-                window.renderFila();
-            } catch (e) {
-                console.error(e);
-            }
+                window.filtrarLogistica(); window.filtrarBI(); window.renderFila();
+            } catch (e) { console.error(e); }
         };
 
         window.resetIndex = async () => {
-            if (confirm("Reiniciar fila?")) {
-                await update(ref(db, `projetos/${projId}/automacao`), { index_atual: 0 });
-                location.reload();
-            }
+            if (confirm("Reiniciar fila?")) { await update(ref(db, `projetos/${projId}/automacao`), { index_atual: 0 }); location.reload(); }
         };
 
         window.confirmarExclusao = async () => {
-            if (confirm("Excluir?")) {
-                await remove(ref(db, window.itemPath));
-                window.carregarRelatorio();
-                window.fecharModalGestao();
-            }
+            if (confirm("Excluir?")) { await remove(ref(db, window.itemPath)); window.carregarRelatorio(); window.fecharModalGestao(); }
         };
 
         window.limparRegistroVisita = async () => {
-            if (confirm("Zerar?")) await update(ref(db, window.itemPath), {
-                resultado: "Pendente", valor: 0, pagamentos: null, num_album: ""
-            });
-            window.carregarRelatorio();
-            window.fecharModalGestao();
+            if (confirm("Zerar?")) await update(ref(db, window.itemPath), { resultado: "Pendente", valor: 0, pagamentos: null, num_album: "" });
+            window.carregarRelatorio(); window.fecharModalGestao();
         };
 
         window.abrirNovoProjeto = () => {
@@ -962,11 +930,30 @@
         window.salvarNovoProjeto = async () => {
             const city = document.getElementById('pC').value;
             const id = city.toLowerCase().replace(/\s+/g, '-');
-            await set(ref(db, `projetos/${id}`), {
-                cidade: city, escola: document.getElementById('pS').value, data_inicio: document.getElementById('pSt').value, data_fim: document.getElementById('pEd').value
-            });
+            await set(ref(db, `projetos/${id}`), { cidade: city, escola: document.getElementById('pS').value, data_inicio: document.getElementById('pSt').value, data_fim: document.getElementById('pEd').value });
             await set(ref(db, "config/projeto_ativo"), id);
             location.reload();
+        };
+
+        window.abrirGestaoVales = () => {
+            document.getElementById('modalGestao').style.display = 'flex';
+            document.getElementById('gestao-menu').classList.add('hidden');
+            const f = document.getElementById('gestao-form');
+            f.classList.remove('hidden');
+            f.innerHTML = `<h3 class="text-rose-400 font-black text-[10px] uppercase mb-4 text-center text-white">Lançar Vales</h3><div class="space-y-4 text-white"><div class="bg-white/5 p-3 rounded-2xl text-white"><p class="text-[8px] text-blue-400 font-bold uppercase mb-1 text-white">EVANIO</p><input type="number" id="vEva" value="${valesDB.evanio||0}" class="input-compact text-white"></div><div class="bg-white/5 p-3 rounded-2xl text-white"><p class="text-[8px] text-cyan-400 font-bold uppercase mb-1 text-white">WILLIAN</p><input type="number" id="vWil" value="${valesDB.willian||0}" class="input-compact text-white"></div></div><button onclick="window.salvarVales()" class="btn-primary w-full py-4 rounded-xl font-black uppercase text-xs mt-4 text-white">Salvar</button>`;
+        };
+
+        window.salvarVales = async () => {
+            await update(ref(db, `vales/${projId}`), { evanio: document.getElementById('vEva').value, willian: document.getElementById('vWil').value });
+            await window.carregarRelatorio(); window.fecharModalGestao();
+        };
+
+        window.abrirAvulso = () => {
+            document.getElementById('modalGestao').style.display = 'flex';
+            document.getElementById('gestao-menu').classList.add('hidden');
+            const f = document.getElementById('gestao-form');
+            f.classList.remove('hidden');
+            f.innerHTML = `<h3 class="text-white font-black text-xs uppercase mb-3 text-white">Novo Avulso</h3><input type="text" id="avN" placeholder="Nome" class="input-compact mb-2 text-white"><input type="date" id="avD" class="input-compact mb-2 text-white"><button onclick="window.salvarAvulso()" class="btn-primary w-full p-3 rounded-xl text-[10px] font-black uppercase text-white">Salvar</button>`;
         };
 
         // --- FUNÇÃO PARA ABRIR O SELETOR DE PROJETOS ---
@@ -975,7 +962,7 @@
             document.getElementById('gestao-menu').classList.add('hidden');
             const f = document.getElementById('gestao-form');
             f.classList.remove('hidden');
-            f.innerHTML = `<h3 class="text-white font-black text-xs uppercase mb-4 text-center">Selecionar Projeto</h3><div id="lista-projetos-selecao" class="space-y-2 max-h-60 overflow-y-auto">Carregando projetos...</div>`;
+            f.innerHTML = `<h3 class="text-white font-black text-xs uppercase mb-4 text-center">Selecionar Projeto</h3><div id="lista-projetos-selecao" class="space-y-2 max-h-60 overflow-y-auto">Carregando...</div>`;
             try {
                 const snap = await get(ref(db, "projetos"));
                 if (snap.exists()) {
@@ -995,62 +982,65 @@
                                     </div>
                                     <p class="text-[8px] text-slate-500">${nomeEscola}</p>
                                 </button>
-                                <button onclick="window.excluirProjeto('${id}')" class="bg-rose-950/30 border border-rose-500/20 px-4 rounded-2xl text-rose-500 hover:bg-rose-500 hover:text-white transition-all">🗑️</button>
+                                <div class="flex flex-col gap-1">
+                                    <button onclick="window.editarInfoProjeto('${id}')" class="bg-blue-950/30 border border-blue-500/20 px-3 flex-grow rounded-xl text-[10px] hover:bg-blue-500 hover:text-white transition-all">✏️</button>
+                                    <button onclick="window.excluirProjeto('${id}')" class="bg-rose-950/30 border border-rose-500/20 px-3 flex-grow rounded-xl text-[10px] hover:bg-rose-500 hover:text-white transition-all">🗑️</button>
+                                </div>
                             </div>`;
                     });
                     document.getElementById('lista-projetos-selecao').innerHTML = html;
                 }
-            } catch (e) {
-                console.error(e);
+            } catch (e) { console.error(e); }
+        };
+
+        // --- FUNÇÃO PARA EDITAR INFO DO PROJETO ---
+        window.editarInfoProjeto = async (id) => {
+            const snap = await get(ref(db, `projetos/${id}`));
+            if (snap.exists()) {
+                const p = snap.val();
+                document.getElementById('modalGestao').style.display = 'flex';
+                document.getElementById('gestao-menu').classList.add('hidden');
+                const f = document.getElementById('gestao-form');
+                f.classList.remove('hidden');
+                f.innerHTML = `
+                    <h3 class="text-blue-400 font-black text-[10px] uppercase mb-4">Editar Projeto</h3>
+                    <input type="text" id="editC" value="${p.cidade || ''}" placeholder="Cidade" class="input-compact mb-2">
+                    <input type="text" id="editS" value="${p.escola || p.school || ''}" placeholder="Escola" class="input-compact mb-2">
+                    <div class="flex gap-2 mb-4">
+                        <input type="date" id="editSt" value="${p.data_inicio || ''}" class="input-compact flex-grow text-[10px]">
+                        <input type="date" id="editEd" value="${p.data_fim || ''}" class="input-compact flex-grow text-[10px]">
+                    </div>
+                    <button onclick="window.salvarEdicaoProjeto('${id}')" class="btn-primary w-full py-4 rounded-xl font-black uppercase text-xs">Salvar Alterações</button>
+                `;
             }
+        };
+
+        window.salvarEdicaoProjeto = async (id) => {
+            await update(ref(db, `projetos/${id}`), {
+                cidade: document.getElementById('editC').value,
+                escola: document.getElementById('editS').value,
+                data_inicio: document.getElementById('editSt').value,
+                data_fim: document.getElementById('editEd').value
+            });
+            alert("✅ Projeto atualizado!");
+            location.reload();
         };
 
         // --- FUNÇÃO PARA TROCAR O PROJETO NO BANCO ---
         window.ativarProjeto = async (id) => {
             if (confirm(`Deseja alternar para o projeto: ${id.toUpperCase()}?`)) {
-                await set(ref(db, "config/projeto_ativo"), id);
-                location.reload(); 
+                await set(ref(db, "config/projeto_ativo"), id); location.reload(); 
             }
         };
 
         // --- FUNÇÃO PARA EXCLUIR PROJETO ---
         window.excluirProjeto = async (id) => {
-            if (confirm(`⚠️ ATENÇÃO: Deseja realmente excluir o projeto ${id.toUpperCase()}? Isso apagará todos os dados vinculados a ele!`)) {
+            if (confirm(`⚠️ EXCLUIR PROJETO ${id.toUpperCase()}?`)) {
                 try {
-                    await remove(ref(db, `projetos/${id}`));
-                    await remove(ref(db, `custos/${id}`));
-                    await remove(ref(db, `vendas/${id}`));
-                    await remove(ref(db, `dados/${id}`));
-                    alert("Projeto excluído com sucesso!");
-                    window.abrirSeletorProjetos();
-                } catch (e) {
-                    alert("Erro ao excluir: " + e.message);
-                }
+                    await Promise.all([remove(ref(db, `projetos/${id}`)), remove(ref(db, `custos/${id}`)), remove(ref(db, `vendas/${id}`)), remove(ref(db, `dados/${id}`))]);
+                    alert("Projeto excluído!"); window.abrirSeletorProjetos();
+                } catch (e) { alert("Erro: " + e.message); }
             }
-        };
-
-        window.abrirGestaoVales = () => {
-            document.getElementById('modalGestao').style.display = 'flex';
-            document.getElementById('gestao-menu').classList.add('hidden');
-            const f = document.getElementById('gestao-form');
-            f.classList.remove('hidden');
-            f.innerHTML = `<h3 class="text-rose-400 font-black text-[10px] uppercase mb-4 text-center text-white">Lançar Vales</h3><div class="space-y-4 text-white"><div class="bg-white/5 p-3 rounded-2xl text-white"><p class="text-[8px] text-blue-400 font-bold uppercase mb-1 text-white">EVANIO</p><input type="number" id="vEva" value="${valesDB.evanio||0}" class="input-compact text-white"></div><div class="bg-white/5 p-3 rounded-2xl text-white"><p class="text-[8px] text-cyan-400 font-bold uppercase mb-1 text-white">WILLIAN</p><input type="number" id="vWil" value="${valesDB.willian||0}" class="input-compact text-white"></div></div><button onclick="window.salvarVales()" class="btn-primary w-full py-4 rounded-xl font-black uppercase text-xs mt-4 text-white">Salvar</button>`;
-        };
-
-        window.salvarVales = async () => {
-            await update(ref(db, `vales/${projId}`), {
-                evanio: document.getElementById('vEva').value, willian: document.getElementById('vWil').value
-            });
-            await window.carregarRelatorio();
-            window.fecharModalGestao();
-        };
-
-        window.abrirAvulso = () => {
-            document.getElementById('modalGestao').style.display = 'flex';
-            document.getElementById('gestao-menu').classList.add('hidden');
-            const f = document.getElementById('gestao-form');
-            f.classList.remove('hidden');
-            f.innerHTML = `<h3 class="text-white font-black text-xs uppercase mb-3 text-white">Novo Avulso</h3><input type="text" id="avN" placeholder="Nome" class="input-compact mb-2 text-white"><input type="date" id="avD" class="input-compact mb-2 text-white"><button onclick="window.salvarAvulso()" class="btn-primary w-full p-3 rounded-xl text-[10px] font-black uppercase text-white">Salvar</button>`;
         };
     </script>
 </body>
