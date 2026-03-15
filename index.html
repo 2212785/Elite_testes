@@ -519,7 +519,19 @@
             const fD = document.getElementById('filtro-bi').value;
             let list = fD ? window.dadosCompletos.filter(i => i.data === fD) : window.dadosCompletos;
             if (tipo !== 'Geral') list = list.filter(i => i.vendedor === tipo);
-            let r = { v: 0, nq: 0, tot: 0, pix: 0, din: 0, deb: 0, cre: 0, bol: 0, ent: 0 };
+            
+            let r = {
+                v: 0,
+                nq: 0,
+                tot: 0,
+                pix: 0,
+                din: 0,
+                deb: 0,
+                cre: 0,
+                bol: 0,
+                ent: 0
+            };
+
             list.forEach(i => {
                 if (i.resultado === "Venda") {
                     r.v++;
@@ -532,13 +544,33 @@
                         else if (t.includes("debito")) r.deb += vP;
                         else if (t.includes("credito")) r.cre += vP;
                         else if (t.includes("boleto")) r.bol += vP;
+                        
+                        // Cálculo de entradas (Vales)
                         if (t.includes("entrada") && (t.includes("pix") || t.includes("dinheiro"))) r.ent += vP;
                     });
                 } else if (i.resultado === "NQ") r.nq++;
             });
-            const texto = `Relatório de Vendas\nProjeto: ${projetoDB.cidade}\nData: ${fD?fD.split('-').reverse().join('/'):"ACUMULADO"}\n\n✅ Vendas: ${r.v}\n❌ NQ: ${r.nq}\n\n💰 Total: ${fBR(r.tot)}\n🎯 Ticket Médio: ${fBR(r.v ? r.tot/r.v : 0)}`;
+
+            // Montagem do texto exatamente como solicitado
+            const texto = `Relatório de Vendas
+Projeto: ${projetoDB.cidade} - ${projetoDB.escola || projetoDB.school || ""}
+Data: ${fD ? fD.split('-').reverse().join('/') : "ACUMULADO GERAL"}
+
+✅ Vendas: ${r.v}
+❌ NQ: ${r.nq}
+
+💵 Dinheiro: ${fBR(r.din)}
+💎 Pix: ${fBR(r.pix)}
+💳 Débito: ${fBR(r.deb)}
+💳 Crédito: ${fBR(r.cre)}
+📄 Boleto: ${fBR(r.bol)}
+💸 Vales: ${fBR(r.ent)}
+
+💰 Total Vendido: ${fBR(r.tot)}
+🎯 Ticket Médio: ${fBR(r.v ? r.tot / r.v : 0)}`;
+
             navigator.clipboard.writeText(texto).then(() => {
-                alert("Copiado!");
+                alert("Relatório Copiado com Sucesso!");
                 window.fecharModalGestao();
             });
         };
