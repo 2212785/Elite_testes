@@ -568,38 +568,83 @@
             });
         };
 
-        // --- GESTÃO E CUSTOS ---
+        // --- GESTÃO E CUSTOS (CORREÇÃO DE CAMPOS FALTANTES) ---
         window.abrirGestaoCentralizada = () => {
-            const c = custosDB;
-            const p = projetoDB;
+            const c = custosDB || {}; 
+            const p = projetoDB || {};
+            
             document.getElementById('modalGestao').style.display = 'flex';
             document.getElementById('gestao-menu').classList.add('hidden');
             const f = document.getElementById('gestao-form');
             f.classList.remove('hidden');
-            const auto = p.automacao || {
-                lista: "",
-                msg1: "",
-                msg2: "",
-                msg3: "",
-                msg4: ""
-            };
-            f.innerHTML = `<h3 class="text-blue-400 font-black text-[10px] uppercase mb-4 text-white">Dados Projeto</h3>
-            <div class="space-y-3 text-white">
-                <div><p class="text-[8px] text-slate-500 uppercase">Período Ativo</p>
-                <div class="flex gap-2 mb-2"><input type="date" id="pDi" value="${p.data_inicio||''}" class="input-compact flex-grow"><input type="date" id="pDf" value="${p.data_fim||''}" class="input-compact flex-grow"></div></div>
-                <div><p class="text-[8px] text-amber-500 uppercase font-bold">Lista Disparo</p><textarea id="pLista" class="input-compact h-24 text-[10px]">${auto.lista || ''}</textarea></div>
-                <div><p class="text-[8px] text-blue-400 uppercase font-bold">Mensagens ({criança} e {escola})</p>
-                <textarea id="m1" class="input-compact h-12 text-[10px] mb-1">${auto.msg1 || ''}</textarea>
-                <textarea id="m2" class="input-compact h-12 text-[10px] mb-1">${auto.msg2 || ''}</textarea>
-                <textarea id="m3" class="input-compact h-12 text-[10px] mb-1">${auto.msg3 || ''}</textarea>
-                <textarea id="m4" class="input-compact h-12 text-[10px] mb-1">${auto.msg4 || ''}</textarea></div>
-                <hr class="opacity-10">
-                <div class="grid grid-cols-2 gap-3">
-                    <div><label class="label-custo">VALOR KM</label><input type="number" id="cKv" value="${c.km_valor||0.7}" class="input-compact"></div>
-                    <div><label class="label-custo">KM TOTAL</label><input type="number" id="cKt" value="${c.km_total||0}" class="input-compact"></div>
+
+            const auto = p.automacao || { lista: "", msg1: "", msg2: "", msg3: "", msg4: "" };
+
+            f.innerHTML = `
+                <h3 class="text-blue-400 font-black text-[10px] uppercase mb-4 text-white">Dados do Projeto</h3>
+                <div class="space-y-3 text-white">
+                    <div>
+                        <p class="text-[8px] text-slate-500 uppercase">Período Ativo</p>
+                        <div class="flex gap-2 mb-2">
+                            <input type="date" id="pDi" value="${p.data_inicio || ''}" class="input-compact flex-grow">
+                            <input type="date" id="pDf" value="${p.data_fim || ''}" class="input-compact flex-grow">
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="text-[8px] text-amber-500 uppercase font-bold">Lista Disparo (Nome, Telefone)</p>
+                        <textarea id="pLista" class="input-compact h-24 text-[10px]">${auto.lista || ''}</textarea>
+                    </div>
+                    <div>
+                        <p class="text-[8px] text-blue-400 uppercase font-bold">Mensagens ({crianca} e {escola})</p>
+                        <textarea id="m1" class="input-compact h-10 text-[10px] mb-1" placeholder="Msg 1">${auto.msg1 || ''}</textarea>
+                        <textarea id="m2" class="input-compact h-10 text-[10px] mb-1" placeholder="Msg 2">${auto.msg2 || ''}</textarea>
+                        <textarea id="m3" class="input-compact h-10 text-[10px] mb-1" placeholder="Msg 3">${auto.msg3 || ''}</textarea>
+                        <textarea id="m4" class="input-compact h-10 text-[10px] mb-1" placeholder="Msg 4">${auto.msg4 || ''}</textarea>
+                    </div>
+
+                    <hr class="opacity-10">
+                    <p class="text-[8px] text-emerald-400 uppercase font-black mb-2">Despesas de Viagem</p>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="label-custo">VALOR KM</label>
+                            <input type="number" id="cKv" value="${c.km_valor || 0.7}" step="0.01" class="input-compact">
+                        </div>
+                        <div>
+                            <label class="label-custo">KM TOTAL</label>
+                            <input type="number" id="cKt" value="${c.km_total || 0}" class="input-compact">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="label-custo">TOTAL PEDÁGIO (R$)</label>
+                        <input type="number" id="cPt" value="${c.pedagio_total || 0}" step="0.01" class="input-compact">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="label-custo">DIÁRIAS HOSP.</label>
+                            <input type="number" id="cHq" value="${c.hosp_qtd || 0}" class="input-compact">
+                        </div>
+                        <div>
+                            <label class="label-custo">VALOR DIÁRIA</label>
+                            <input type="number" id="cHv" value="${c.hosp_valor || 0}" step="0.01" class="input-compact">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="label-custo">QTD ALIMENT.</label>
+                            <input type="number" id="cAq" value="${c.alim_qtd || 0}" class="input-compact">
+                        </div>
+                        <div>
+                            <label class="label-custo">VALOR UNIT.</label>
+                            <input type="number" id="cAv" value="${c.alim_valor || 0}" step="0.01" class="input-compact">
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <button onclick="window.salvarTudoProjeto()" class="btn-primary w-full py-4 rounded-xl font-black uppercase text-xs mt-6">Gravar Tudo</button>`;
+                <button onclick="window.salvarTudoProjeto()" class="btn-primary w-full py-4 rounded-xl font-black uppercase text-xs mt-6">Gravar Tudo</button>
+            `;
         };
 
         window.salvarTudoProjeto = async () => {
