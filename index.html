@@ -279,7 +279,7 @@
                 
                 // Atualiza o indicador visual de qual projeto está rodando
                 if(document.getElementById('nome-projeto-logistica')) {
-                    document.getElementById('nome-projeto-logistica').innerText = projetoDB.cidade + " - " + (projetoDB.escola || "");
+                    document.getElementById('nome-projeto-logistica').innerText = projetoDB.cidade + " - " + (projetoDB.escola || projetoDB.school || "Escola não informada");
                 }
 
                 if (projetoDB.data_inicio) {
@@ -288,10 +288,12 @@
 
                 window.carregarRelatorio();
 
+                // LEI: Persistência de Login ADM
                 if (sessionStorage.getItem('isAdm') === 'true') {
                     document.getElementById('controles-admin').classList.remove('hidden');
                 }
 
+                // --- ESCUTA DO STATUS DO BOT (LED) ---
                 onValue(ref(db, `projetos/${projId}/bot`), (botSnap) => {
                     const led = document.getElementById('bot-led');
                     const txt = document.getElementById('bot-status-text');
@@ -426,15 +428,19 @@
                     Object.keys(projetos).forEach(id => {
                         const p = projetos[id];
                         const estaAtivo = (id === projId);
+                        const nomeEscola = p.escola || p.school || "Escola não informada";
                         html += `
-                            <button onclick="window.ativarProjeto('${id}')" 
-                                class="w-full p-4 rounded-2xl text-left transition-all border ${estaAtivo ? 'border-amber-500 bg-amber-500/20' : 'border-white/5 bg-white/5 hover:bg-white/10'}">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-[10px] font-bold text-white uppercase">${p.cidade}</span>
-                                    ${estaAtivo ? '<span class="text-[8px] bg-amber-500 text-black px-2 py-0.5 rounded font-black">ATIVO</span>' : ''}
-                                </div>
-                                <p class="text-[8px] text-slate-500">${p.escola || 'Sem escola'}</p>
-                            </button>`;
+                            <div class="flex gap-2 items-stretch">
+                                <button onclick="window.ativarProjeto('${id}')" 
+                                    class="flex-grow p-4 rounded-2xl text-left transition-all border ${estaAtivo ? 'border-amber-500 bg-amber-500/20' : 'border-white/5 bg-white/5 hover:bg-white/10'}">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-[10px] font-bold text-white uppercase">${p.cidade}</span>
+                                        ${estaAtivo ? '<span class="text-[8px] bg-amber-500 text-black px-2 py-0.5 rounded font-black">ATIVO</span>' : ''}
+                                    </div>
+                                    <p class="text-[8px] text-slate-500">${nomeEscola}</p>
+                                </button>
+                                <button onclick="window.excluirProjeto('${id}')" class="bg-rose-950/30 border border-rose-500/20 px-4 rounded-2xl text-rose-500 hover:bg-rose-500 hover:text-white transition-all">🗑️</button>
+                            </div>`;
                     });
                     document.getElementById('lista-projetos-selecao').innerHTML = html;
                 }
@@ -448,6 +454,22 @@
             if (confirm(`Deseja alternar para o projeto: ${id.toUpperCase()}?`)) {
                 await set(ref(db, "config/projeto_ativo"), id);
                 location.reload(); 
+            }
+        };
+
+        // --- FUNÇÃO PARA EXCLUIR PROJETO ---
+        window.excluirProjeto = async (id) => {
+            if (confirm(`⚠️ ATENÇÃO: Deseja realmente excluir o projeto ${id.toUpperCase()}? Isso apagará todos os dados vinculados a ele!`)) {
+                try {
+                    await remove(ref(db, `projetos/${id}`));
+                    await remove(ref(db, `custos/${id}`));
+                    await remove(ref(db, `vendas/${id}`));
+                    await remove(ref(db, `dados/${id}`));
+                    alert("Projeto excluído com sucesso!");
+                    window.abrirSeletorProjetos();
+                } catch (e) {
+                    alert("Erro ao excluir: " + e.message);
+                }
             }
         };
 
@@ -570,7 +592,10 @@
                         y: { display: false },
                         x: {
                             grid: { display: false },
-                            ticks: { color: '#64748b', font: { size: 8 } }
+                            ticks: {
+                                color: '#64748b',
+                                font: { size: 8 }
+                            }
                         }
                     }
                 }
@@ -942,6 +967,66 @@
             });
             await set(ref(db, "config/projeto_ativo"), id);
             location.reload();
+        };
+
+        // --- FUNÇÃO PARA ABRIR O SELETOR DE PROJETOS ---
+        window.abrirSeletorProjetos = async () => {
+            document.getElementById('modalGestao').style.display = 'flex';
+            document.getElementById('gestao-menu').classList.add('hidden');
+            const f = document.getElementById('gestao-form');
+            f.classList.remove('hidden');
+            f.innerHTML = `<h3 class="text-white font-black text-xs uppercase mb-4 text-center">Selecionar Projeto</h3><div id="lista-projetos-selecao" class="space-y-2 max-h-60 overflow-y-auto">Carregando projetos...</div>`;
+            try {
+                const snap = await get(ref(db, "projetos"));
+                if (snap.exists()) {
+                    const projetos = snap.val();
+                    let html = "";
+                    Object.keys(projetos).forEach(id => {
+                        const p = projetos[id];
+                        const estaAtivo = (id === projId);
+                        const nomeEscola = p.escola || p.school || "Escola não informada";
+                        html += `
+                            <div class="flex gap-2 items-stretch">
+                                <button onclick="window.ativarProjeto('${id}')" 
+                                    class="flex-grow p-4 rounded-2xl text-left transition-all border ${estaAtivo ? 'border-amber-500 bg-amber-500/20' : 'border-white/5 bg-white/5 hover:bg-white/10'}">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-[10px] font-bold text-white uppercase">${p.cidade}</span>
+                                        ${estaAtivo ? '<span class="text-[8px] bg-amber-500 text-black px-2 py-0.5 rounded font-black">ATIVO</span>' : ''}
+                                    </div>
+                                    <p class="text-[8px] text-slate-500">${nomeEscola}</p>
+                                </button>
+                                <button onclick="window.excluirProjeto('${id}')" class="bg-rose-950/30 border border-rose-500/20 px-4 rounded-2xl text-rose-500 hover:bg-rose-500 hover:text-white transition-all">🗑️</button>
+                            </div>`;
+                    });
+                    document.getElementById('lista-projetos-selecao').innerHTML = html;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        };
+
+        // --- FUNÇÃO PARA TROCAR O PROJETO NO BANCO ---
+        window.ativarProjeto = async (id) => {
+            if (confirm(`Deseja alternar para o projeto: ${id.toUpperCase()}?`)) {
+                await set(ref(db, "config/projeto_ativo"), id);
+                location.reload(); 
+            }
+        };
+
+        // --- FUNÇÃO PARA EXCLUIR PROJETO ---
+        window.excluirProjeto = async (id) => {
+            if (confirm(`⚠️ ATENÇÃO: Deseja realmente excluir o projeto ${id.toUpperCase()}? Isso apagará todos os dados vinculados a ele!`)) {
+                try {
+                    await remove(ref(db, `projetos/${id}`));
+                    await remove(ref(db, `custos/${id}`));
+                    await remove(ref(db, `vendas/${id}`));
+                    await remove(ref(db, `dados/${id}`));
+                    alert("Projeto excluído com sucesso!");
+                    window.abrirSeletorProjetos();
+                } catch (e) {
+                    alert("Erro ao excluir: " + e.message);
+                }
+            }
         };
 
         window.abrirGestaoVales = () => {
